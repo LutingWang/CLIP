@@ -206,7 +206,7 @@ def load_default(adaptive: bool) -> tuple[CLIP, Compose]:
 
 
 def load_default(adaptive=None):
-    device = 'cuda' if todd.Store.CUDA else 'cpu'
+    device = 'cuda' if todd.Store.cuda else 'cpu'
     model, preprocess = load('ViT-B/32', device=device, download_root='pretrained/clip')
     if adaptive is None:
         return model, None
