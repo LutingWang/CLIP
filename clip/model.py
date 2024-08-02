@@ -226,8 +226,9 @@ class VisionTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, return_2d: bool | None = None):
         x = self.conv1(x)  # shape = [*, width, grid, grid]
+        b, c, h, w = x.shape
 
         positional_embedding = self.interpolate_positional_embedding(x.shape[-2:])
 
@@ -241,10 +242,14 @@ class VisionTransformer(nn.Module):
         x = self.transformer(x)
         x = x.permute(1, 0, 2)  # LND -> NLD
 
-        x = self.ln_post(x[:, 0, :])
+        x = x[:, 0, :] if return_2d is None else x[:, 1:, :]
+        x = self.ln_post(x)
 
         if self.proj is not None:
             x = x @ self.proj
+
+        if return_2d:
+            x = einops.rearrange(x, 'b (h w) c -> b c h w', h=h, w=w)
 
         return x
 
@@ -356,8 +361,11 @@ class CLIP(nn.Module):
     def dtype(self):
         return self.visual.conv1.weight.dtype
 
-    def encode_image(self, image):
-        return self.visual(image.type(self.dtype))
+    def encode_image(self, image, return_2d: bool | None = None):
+        image = image.type(self.dtype)
+        if return_2d is None:
+            return self.visual(image)
+        return self.visual(image, return_2d)
 
     def encode_text(self, text):
         x = self.token_embedding(text).type(self.dtype)  # [batch_size, n_ctx, d_model]
